@@ -1,17 +1,18 @@
+#include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
-#include <string.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
-//#include <pthread.h>
 
+#include "http.h"
 #include "server.h"
 
-#define SERVER_BACKLOG 10
-#define SERVER_PORT    80
+#define HTTPREQUESTSIZE 1024 
+#define SERVER_BACKLOG  10
+#define SERVER_PORT     80 
 
 void* handle_request(void* client);
 
@@ -22,16 +23,16 @@ void init_server(struct Server *server) {
     }
 
     int on = 1;
-    if (setsockopt(server->socket, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(int)) == -1) {
+    if (setsockopt(server->socket, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on)) == -1) {
         perror("Socket configuring failed");
     }
 
-    memset(&(server->serv_addr), 0, sizeof(struct sockaddr_in));
-    server->serv_addr.sin_family      = AF_INET;
-    server->serv_addr.sin_addr.s_addr = htonl(INADDR_ANY);
-    server->serv_addr.sin_port        = htons(SERVER_PORT);
+    memset(&(server->addr), 0, sizeof(server->addr));
+    server->addr.sin_family      = AF_INET;
+    server->addr.sin_addr.s_addr = htonl(INADDR_ANY);
+    server->addr.sin_port        = htons(SERVER_PORT);
 
-    if (bind(server->socket, (struct sockaddr*) &(server->serv_addr), sizeof(struct sockaddr)) == -1) {
+    if (bind(server->socket, (struct sockaddr*) &(server->addr), sizeof(struct sockaddr)) == -1) {
         perror("Socket binding failed");
     }
 
@@ -40,19 +41,45 @@ void init_server(struct Server *server) {
         exit(0);
     }
 
-    char* reply = "Hello \n";
+    pthread_t pid;
     struct sockaddr_in6 cli_addr;
     int client;
     while (1) {
-        socklen_t clilen = sizeof(struct sockaddr_in6); 
+        socklen_t clilen = sizeof(cli_addr); 
         client = accept(server->socket, (struct sockaddr*) &cli_addr, &clilen);
-        write(client, reply, strlen(reply)); 
-        close(client);
-        sleep(1);
+        if (client == -1) {
+            sleep(1);
+            continue;
+        }
+
+        int* cli_socket = (int*) malloc(sizeof(cli_socket));
+        *cli_socket = client;
+        //pthread_create(&pid, NULL, handle_request, cli_socket);
+        handle_request(cli_socket);
     }
 }
 
-/*
-void* handle_request(void* client) {
+void* handle_request(void* arg) {
+    printf("Accepted \n");
+    int client = *((int*) arg);
+
+    int buffer_in_length;
+    char buffer_in[HTTPREQUESTSIZE];
+    if ((buffer_in_length = recv(client, buffer_in, sizeof(buffer_in) - 1, 0)) == 0) {
+        perror("Receiving failed");
+    } else {
+        buffer_in[buffer_in_length] = '\0';
+        printf("%s \n", buffer_in);
+
+        struct HttpRequest req;
+        parse_http_req(&req, buffer_in);
+
+        char* reply = "hello world";
+        send(client, reply, strlen(reply), 0);
+    }
+
+    free(arg);
+    close(client);
+    pthread_detach(pthread_self());
+    return NULL;
 }
-*/
