@@ -54,8 +54,7 @@ void init_server(struct Server *server) {
 
         int* cli_socket = (int*) malloc(sizeof(cli_socket));
         *cli_socket = client;
-        //pthread_create(&pid, NULL, handle_request, cli_socket);
-        handle_request(cli_socket);
+        pthread_create(&pid, NULL, handle_request, cli_socket);
     }
 }
 

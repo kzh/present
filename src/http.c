@@ -49,3 +49,20 @@ void parse_http_req(struct HttpRequest *req, char *str) {
         insert_header(req, &header);
     }
 }
+
+char* get_header_from(struct HttpRequest *req, char *search) {
+    if (req->headers_count == 0) {
+        return NULL;
+    }
+
+    struct Header *header = req->headers;
+    while (header->next != NULL) {
+        if (strcmp(header->name, search) == 0) {
+            return header->value;
+        }
+
+        header = header->next;
+    }
+
+    return NULL;
+}
