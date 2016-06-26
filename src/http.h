@@ -17,4 +17,5 @@ struct HttpRequest {
 
 void parse_http_req(struct HttpRequest *req, char *buffer);
 char* get_header_from(struct HttpRequest *req, char *search); 
+void free_http_req(struct HttpRequest *req);
 #endif

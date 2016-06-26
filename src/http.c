@@ -66,3 +66,16 @@ char* get_header_from(struct HttpRequest *req, char *search) {
 
     return NULL;
 }
+
+void free_headers(struct Header *headers) {
+    if (headers->next != NULL) {
+        free_headers(headers->next);
+    }
+
+    free(headers);
+}
+
+void free_http_req(struct HttpRequest *req) {
+    free_headers(req->headers);
+    free(req->raw);
+} 

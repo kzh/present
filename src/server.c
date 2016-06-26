@@ -72,6 +72,7 @@ void* handle_request(void* arg) {
 
         struct HttpRequest req;
         parse_http_req(&req, buffer_in);
+        free_http_req(&req);
 
         char* reply = "hello world";
         send(client, reply, strlen(reply), 0);
