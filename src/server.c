@@ -14,7 +14,33 @@
 #define SERVER_BACKLOG  10
 #define SERVER_PORT     80 
 
-void* handle_request(void* client);
+void respond(int client, struct HttpRequest *req) {
+    char* reply = "hello world";
+    send(client, reply, strlen(reply), 0);
+}
+
+void* handle_request(void* arg) {
+    int client = *((int*) arg);
+
+    int buffer_in_length;
+    char buffer_in[HTTPREQUESTSIZE];
+    if ((buffer_in_length = recv(client, buffer_in, sizeof(buffer_in) - 1, 0)) == 0) {
+        perror("Receiving failed");
+    } else {
+        buffer_in[buffer_in_length] = '\0';
+        printf("%s \n", buffer_in);
+
+        struct HttpRequest req;
+        parse_http_req(&req, buffer_in);
+        respond(client, &req);
+        free_http_req(&req);
+    }
+
+    free(arg);
+    close(client);
+    pthread_detach(pthread_self());
+    return NULL;
+}
 
 void init_server(struct Server *server) {
     server->socket = socket(AF_INET, SOCK_STREAM, 0);
@@ -56,30 +82,4 @@ void init_server(struct Server *server) {
         *cli_socket = client;
         pthread_create(&pid, NULL, handle_request, cli_socket);
     }
-}
-
-void* handle_request(void* arg) {
-    printf("Accepted \n");
-    int client = *((int*) arg);
-
-    int buffer_in_length;
-    char buffer_in[HTTPREQUESTSIZE];
-    if ((buffer_in_length = recv(client, buffer_in, sizeof(buffer_in) - 1, 0)) == 0) {
-        perror("Receiving failed");
-    } else {
-        buffer_in[buffer_in_length] = '\0';
-        printf("%s \n", buffer_in);
-
-        struct HttpRequest req;
-        parse_http_req(&req, buffer_in);
-        free_http_req(&req);
-
-        char* reply = "hello world";
-        send(client, reply, strlen(reply), 0);
-    }
-
-    free(arg);
-    close(client);
-    pthread_detach(pthread_self());
-    return NULL;
 }

@@ -15,7 +15,7 @@ int parse_header(struct Header *header, char *str) {
 } 
 
 void insert_header(struct HttpRequest *req, struct Header *header) {
-    header->next = (struct Header*) malloc(sizeof(struct Header));
+    header->next = (struct Header*) calloc(1, sizeof(struct Header));
     if (req->headers_count == 0) {
         memcpy(req->headers, header, sizeof(struct Header));
     } else {
@@ -32,7 +32,7 @@ void parse_http_req(struct HttpRequest *req, char *str) {
     req->raw = (char*) malloc(strlen(str) + 1);
     strcpy(req->raw, str);
     req->headers_count = 0;
-    req->headers       = (struct Header*) malloc(sizeof(struct Header));
+    req->headers       = (struct Header*) calloc(1, sizeof(struct Header));
 
     char *save;
     req->method  = strtok_r(req->raw, " ", &save);
@@ -78,4 +78,4 @@ void free_headers(struct Header *headers) {
 void free_http_req(struct HttpRequest *req) {
     free_headers(req->headers);
     free(req->raw);
-} 
+}
