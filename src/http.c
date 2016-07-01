@@ -10,9 +10,9 @@ int parse_header(struct Header *header, char *str) {
 
     char *save;
     header->name  = strtok_r(str, ":", &save);
-    header->value = strtok_r(NULL, "", &save) + 1;
+    header->value = strtok_r(NULL, "", &save);
     return 1;
-} 
+}
 
 void insert_header(struct HttpRequest *req, struct Header *header) {
     header->next = (struct Header*) calloc(1, sizeof(struct Header));
@@ -28,9 +28,39 @@ void insert_header(struct HttpRequest *req, struct Header *header) {
     req->headers_count++;
 }
 
+void prepare_str(char *str) {
+    int length = strlen(str);
+    for (int i = 0; i != length; i++) {
+        if (str[i] != ':' || str[i + 1] != ' ') {
+            continue;
+        }
+
+        char *dest = str + (++i);
+        while (i < length && (str[++i] == ' ' || str[i] == '\t')); 
+
+        char *move = str + i;
+        if (dest != move) {
+            memmove(dest, move, strlen(move) + 1);
+        }
+
+        i = dest - str;
+
+        while (1) {
+            while (i < length && (str[++i] != '\r' && str[i] != '\n'));
+            dest = str + i;
+            if (str[i + 1] == ' ' || str[i + 1] == '\t') {
+                while (i < length && (str[++i] == ' ' || str[i] == '\t'));
+                memmove(dest, str + i, strlen(str + i) + 1);
+            } else {
+                break;
+            }
+        }
+    }
+}
+
 void parse_http_req(struct HttpRequest *req, char *str) {
-    req->raw = (char*) malloc(strlen(str) + 1);
-    strcpy(req->raw, str);
+    prepare_str(str);
+    req->raw = strdup(str);
     req->headers_count = 0;
     req->headers       = (struct Header*) calloc(1, sizeof(struct Header));
 
@@ -48,6 +78,7 @@ void parse_http_req(struct HttpRequest *req, char *str) {
 
         insert_header(req, &header);
     }
+    printf("%s\n", get_header_from(req, "Host"));
 }
 
 char* get_header_from(struct HttpRequest *req, char *search) {
