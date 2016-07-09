@@ -6,6 +6,7 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <pthread.h>
 
 #include "http.h"
 #include "server.h"
@@ -14,35 +15,91 @@
 #define SERVER_BACKLOG  10
 #define SERVER_PORT     80 
 
-void respond(int client, struct HttpRequest *req) {
-    char* reply = "hello world";
-    send(client, reply, strlen(reply), 0);
+struct client {
+    struct server *server;
+    int socket;
+};
+
+char* identify(struct server *server, char* p) {
+    char* path = malloc(sizeof(p) + 1);
+    strcpy(path, p);
+
+    for (struct route *route = server->routes; route != NULL; route = route->next) {
+        if (strncmp(route->route, path, strlen(route->route)) != 0) {
+            continue;
+        }
+
+        char* tmp = (char*) malloc(strlen(route->to) + strlen(path + strlen(route->route))); 
+        strcpy(tmp, route->to);
+        strcat(tmp, path + strlen(route->route));
+
+        free(path);
+        path = tmp;
+        break;
+    }
+
+    return path;
+}
+
+void respond(struct client *client, struct http_request *req) {
+    char* path = identify(client->server, req->path);
+    printf("Path: %s\n", path);
+
+    //handle errors
+
+    FILE *f;
+    f = fopen(path, "r");
+
+    if (f == NULL) {
+
+        //send 404
+
+        fclose(f);
+        free(path);
+        return;
+    }
+
+    fseek(f, 0, SEEK_END);
+    long size = ftell(f);
+    fseek(f, 0, SEEK_SET);
+
+    char reply[size];
+    fread(reply, size, 1, f);
+
+    send(client->socket, reply, size, 0);
+
+    fclose(f);
+    free(path);
 }
 
 void* handle_request(void* arg) {
-    int client = *((int*) arg);
+    struct client *client = (struct client*) arg;
 
     int buffer_in_length;
     char buffer_in[HTTPREQUESTSIZE];
-    if ((buffer_in_length = recv(client, buffer_in, sizeof(buffer_in) - 1, 0)) == 0) {
+    if ((buffer_in_length = recv(client->socket, buffer_in, sizeof(buffer_in) - 1, 0)) == 0) {
         perror("Receiving failed");
     } else {
         buffer_in[buffer_in_length] = '\0';
         printf("%s \n", buffer_in);
 
-        struct HttpRequest req;
+        struct http_request req;
         parse_http_req(&req, buffer_in);
         respond(client, &req);
         free_http_req(&req);
     }
 
     free(arg);
-    close(client);
+    close(client->socket);
     pthread_detach(pthread_self());
     return NULL;
 }
 
-void init_server(struct Server *server) {
+void init_server(struct server *server) {
+    memset(server, 0, sizeof(struct server));
+}
+
+void run_server(struct server *server) {
     server->socket = socket(AF_INET, SOCK_STREAM, 0);
     if (server->socket == -1) {
         perror("Socket creation failed");
@@ -69,17 +126,32 @@ void init_server(struct Server *server) {
 
     pthread_t pid;
     struct sockaddr_in6 cli_addr;
-    int client;
+    int cli_socket;
     while (1) {
-        socklen_t clilen = sizeof(cli_addr); 
-        client = accept(server->socket, (struct sockaddr*) &cli_addr, &clilen);
-        if (client == -1) {
+        socklen_t clilen = sizeof(cli_addr);
+        cli_socket = accept(server->socket, (struct sockaddr*) &cli_addr, &clilen);
+        if (cli_socket == -1) {
             sleep(1);
             continue;
         }
 
-        int* cli_socket = (int*) malloc(sizeof(cli_socket));
-        *cli_socket = client;
-        pthread_create(&pid, NULL, handle_request, cli_socket);
+        struct client *client = (struct client*) malloc(sizeof(struct client));
+        *client = (struct client) {server, cli_socket};
+        pthread_create(&pid, NULL, handle_request, client);
+    }
+}
+
+void serve(struct server *server, char *route, char *to) {
+    struct route *r = (struct route*) malloc(sizeof(struct route));
+    r->route = route;
+    r->to    = to;
+    r->next  = NULL;
+
+    if (server->routes == NULL) {
+        server->routes = r;
+    } else {
+        struct route *tmp;
+        for (; tmp->next != NULL; tmp = tmp->next);
+        tmp->next = r;
     }
 }

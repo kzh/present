@@ -4,12 +4,21 @@
 #define HTTPSERVER
 
 #include <netdb.h>
-#include <pthread.h>
 
-struct Server {
-    struct sockaddr_in addr;
-    int socket;
+struct route {
+    char *route, *to;
+
+    struct route *next;
 };
 
-void init_server(struct Server *server); 
+struct server {
+    struct sockaddr_in addr;
+    int socket;
+
+    struct route *routes;
+};
+
+void init_server(struct server *server); 
+void run_server(struct server *server); 
+void serve(struct server *server, char *path, char *to);
 #endif

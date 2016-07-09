@@ -3,7 +3,7 @@
 #include <string.h>
 #include "http.h"
 
-int parse_header(struct Header *header, char *str) {
+int parse_header(struct header *header, char *str) {
     if (strstr(str, ":") == NULL) {
         return 0;
     }
@@ -14,20 +14,23 @@ int parse_header(struct Header *header, char *str) {
     return 1;
 }
 
-void insert_header(struct HttpRequest *req, struct Header *header) {
-    header->next = (struct Header*) calloc(1, sizeof(struct Header));
+void insert_header(struct http_request *req, struct header *header) {
+    header->next = (struct header*) calloc(1, sizeof(struct header));
     if (req->headers_count == 0) {
-        memcpy(req->headers, header, sizeof(struct Header));
+        memcpy(req->headers, header, sizeof(struct header));
     } else {
-        struct Header* tmp = req->headers;
+        struct header *tmp = req->headers;
         for (int i = 0; i != req->headers_count; i++) {
             tmp = tmp->next;
         }
-        memcpy(tmp, header, sizeof(struct Header));
+        memcpy(tmp, header, sizeof(struct header));
     }
     req->headers_count++;
 }
 
+// Condense raw http request strings
+// - Removes spaces/tabs between : and header value
+// - Combines multilined header values into one line 
 void prepare_str(char *str) {
     int length = strlen(str);
     for (int i = 0; i != length; i++) {
@@ -58,11 +61,15 @@ void prepare_str(char *str) {
     }
 }
 
-void parse_http_req(struct HttpRequest *req, char *str) {
+void parse_http_req(struct http_request *req, char *str) {
     prepare_str(str);
-    req->raw = strdup(str);
+
+    char* tmp = malloc(strlen(str) + 1);
+    strcpy(tmp, str);
+
+    req->raw = tmp;
     req->headers_count = 0;
-    req->headers       = (struct Header*) calloc(1, sizeof(struct Header));
+    req->headers       = (struct header*) calloc(1, sizeof(struct header));
 
     char *save;
     req->method  = strtok_r(req->raw, " ", &save);
@@ -71,22 +78,21 @@ void parse_http_req(struct HttpRequest *req, char *str) {
 
     char *token;
     while ((token = strtok_r(NULL, "\n\r", &save)) != NULL) {
-        struct Header header;
+        struct header header;
         if (!parse_header(&header, token)) {
             break;
         }
 
         insert_header(req, &header);
     }
-    printf("%s\n", get_header_from(req, "Host"));
 }
 
-char* get_header_from(struct HttpRequest *req, char *search) {
+char* get_header_from(struct http_request *req, char *search) {
     if (req->headers_count == 0) {
         return NULL;
     }
 
-    struct Header *header = req->headers;
+    struct header *header = req->headers;
     while (header->next != NULL) {
         if (strcmp(header->name, search) == 0) {
             return header->value;
@@ -98,7 +104,7 @@ char* get_header_from(struct HttpRequest *req, char *search) {
     return NULL;
 }
 
-void free_headers(struct Header *headers) {
+void free_headers(struct header *headers) {
     if (headers->next != NULL) {
         free_headers(headers->next);
     }
@@ -106,7 +112,7 @@ void free_headers(struct Header *headers) {
     free(headers);
 }
 
-void free_http_req(struct HttpRequest *req) {
+void free_http_req(struct http_request *req) {
     free_headers(req->headers);
     free(req->raw);
 }
