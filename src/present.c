@@ -3,7 +3,7 @@
 int main() {
     struct server server;
     init_server(&server);
-    serve(&server, "/", "public/");
+    serve(&server, "/", "public");
     run_server(&server);
 
     return 0;

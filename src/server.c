@@ -29,8 +29,9 @@ char* identify(struct server *server, char* p) {
             continue;
         }
 
-        char* tmp = (char*) malloc(strlen(route->to) + strlen(path + strlen(route->route))); 
+        char* tmp = (char*) malloc(strlen(route->to) + strlen(path + strlen(route->route)) + 1);
         strcpy(tmp, route->to);
+        strcat(tmp, "/");
         strcat(tmp, path + strlen(route->route));
 
         free(path);
@@ -38,35 +39,64 @@ char* identify(struct server *server, char* p) {
         break;
     }
 
+    if (path[strlen(path) - 1] == '/') {
+        const char* alts[] = {"index.html", "index.tmpl"};
+        for (int i = 0; i != sizeof(alts) / sizeof(alts[0]); i++) {
+            char *tmp = (char*) malloc(strlen(path) + strlen(alts[i]));
+            strcpy(tmp, path);
+            strcat(tmp, alts[i]);
+
+            if (access(tmp, F_OK) == -1) {
+                free(tmp);
+                continue;
+            }
+
+            free(path);
+            path = tmp;
+        }
+    }
+
     return path;
 }
 
-void respond(struct client *client, struct http_request *req) {
-    char* path = identify(client->server, req->path);
+void respond(struct client *client, struct http_message *msg) {
+    char* path = identify(client->server, msg->info[REQUEST_PATH]);
     printf("Path: %s\n", path);
-
-    //handle errors
 
     FILE *f;
     f = fopen(path, "r");
 
     if (f == NULL) {
+        /*
+        char *moved = NULL;
+        if (path[strlen(path) - 1] != '/') {
+            char tmp[strlen(path) + 1];
+            strcpy(tmp, path);
+            strcat(tmp, "/");
 
-        //send 404
+            moved = identify(tmp);
+            if (strcmp(moved, tmp) != 0) {
 
-        fclose(f);
-        free(path);
-        return;
+            } else {
+                free(moved);
+                moved = NULL;
+            }
+        }
+
+        if (moved == NULL) {
+
+        }
+        */
+    } else {
+        fseek(f, 0, SEEK_END);
+        long size = ftell(f);
+        fseek(f, 0, SEEK_SET);
+
+        char reply[size];
+        fread(reply, size, 1, f);
+
+        send(client->socket, reply, size, 0);
     }
-
-    fseek(f, 0, SEEK_END);
-    long size = ftell(f);
-    fseek(f, 0, SEEK_SET);
-
-    char reply[size];
-    fread(reply, size, 1, f);
-
-    send(client->socket, reply, size, 0);
 
     fclose(f);
     free(path);
@@ -83,10 +113,10 @@ void* handle_request(void* arg) {
         buffer_in[buffer_in_length] = '\0';
         printf("%s \n", buffer_in);
 
-        struct http_request req;
-        parse_http_req(&req, buffer_in);
-        respond(client, &req);
-        free_http_req(&req);
+        struct http_message msg;
+        parse_http_message(&msg, buffer_in);
+        respond(client, &msg);
+        free_http_message(&msg);
     }
 
     free(arg);

@@ -14,21 +14,21 @@ int parse_header(struct header *header, char *str) {
     return 1;
 }
 
-void insert_header(struct http_request *req, struct header *header) {
+void insert_header(struct http_message *msg, struct header *header) {
     header->next = (struct header*) calloc(1, sizeof(struct header));
-    if (req->headers_count == 0) {
-        memcpy(req->headers, header, sizeof(struct header));
+    if (msg->headers_count == 0) {
+        memcpy(msg->headers, header, sizeof(struct header));
     } else {
-        struct header *tmp = req->headers;
-        for (int i = 0; i != req->headers_count; i++) {
+        struct header *tmp = msg->headers;
+        for (int i = 0; i != msg->headers_count; i++) {
             tmp = tmp->next;
         }
         memcpy(tmp, header, sizeof(struct header));
     }
-    req->headers_count++;
+    msg->headers_count++;
 }
 
-// Condense raw http request strings
+// Condenses raw http message strings
 // - Removes spaces/tabs between : and header value
 // - Combines multilined header values into one line 
 void prepare_str(char *str) {
@@ -61,20 +61,16 @@ void prepare_str(char *str) {
     }
 }
 
-void parse_http_req(struct http_request *req, char *str) {
+void parse_http_message(struct http_message *msg, char *str) {
     prepare_str(str);
 
-    char* tmp = malloc(strlen(str) + 1);
-    strcpy(tmp, str);
-
-    req->raw = tmp;
-    req->headers_count = 0;
-    req->headers       = (struct header*) calloc(1, sizeof(struct header));
+    msg->headers_count = 0;
+    msg->headers       = (struct header*) calloc(1, sizeof(struct header));
 
     char *save;
-    req->method  = strtok_r(req->raw, " ", &save);
-    req->path    = strtok_r(NULL, " ", &save);
-    req->version = strtok_r(NULL, "\n\r", &save);
+    msg->info[REQUEST_METHOD]  = strtok_r(str, " ", &save);
+    msg->info[REQUEST_PATH]    = strtok_r(NULL, " ", &save);
+    msg->info[REQUEST_VERSION] = strtok_r(NULL, "\n\r", &save);
 
     char *token;
     while ((token = strtok_r(NULL, "\n\r", &save)) != NULL) {
@@ -83,16 +79,16 @@ void parse_http_req(struct http_request *req, char *str) {
             break;
         }
 
-        insert_header(req, &header);
+        insert_header(msg, &header);
     }
 }
 
-char* get_header_from(struct http_request *req, char *search) {
-    if (req->headers_count == 0) {
+char* get_header_from(struct http_message *msg, char *search) {
+    if (msg->headers_count == 0) {
         return NULL;
     }
 
-    struct header *header = req->headers;
+    struct header *header = msg->headers;
     while (header->next != NULL) {
         if (strcmp(header->name, search) == 0) {
             return header->value;
@@ -112,7 +108,6 @@ void free_headers(struct header *headers) {
     free(headers);
 }
 
-void free_http_req(struct http_request *req) {
-    free_headers(req->headers);
-    free(req->raw);
+void free_http_message(struct http_message *msg) {
+    free_headers(msg->headers);
 }
