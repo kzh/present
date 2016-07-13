@@ -199,7 +199,7 @@ void serve(struct server *server, char *route, char *to) {
     if (server->routes == NULL) {
         server->routes = r;
     } else {
-        struct route *tmp;
+        struct route *tmp = server->routes;
         for (; tmp->next != NULL; tmp = tmp->next);
         tmp->next = r;
     }

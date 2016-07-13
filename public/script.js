@@ -1,3 +1,3 @@
 window.onload = function() {
-    document.write("Hello again!");
+    alert("suh dud");
 };
