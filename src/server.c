@@ -1,5 +1,7 @@
 #include <string.h>
 #include <stdio.h>
+#include <sys/types.h>
+#include <dirent.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <sys/types.h>
@@ -7,6 +9,8 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <pthread.h>
+#include <ctype.h>
+
 
 #include "http.h"
 #include "server.h"
@@ -63,42 +67,58 @@ void respond(struct client *client, struct http_message *msg) {
     char* path = identify(client->server, msg->info[REQUEST_PATH]);
     printf("Path: %s\n", path);
 
+    struct http_message response;
+    memset(&response, 0, sizeof(response));
+    response.info[RESPONSE_VERSION]     = "HTTP/1.1";
+
     FILE *f;
-    f = fopen(path, "r");
+    f = fopen(path, "r+b");
 
     if (f == NULL) {
-        /*
-        char *moved = NULL;
+        int moved = 0;
         if (path[strlen(path) - 1] != '/') {
             char tmp[strlen(path) + 1];
             strcpy(tmp, path);
             strcat(tmp, "/");
 
-            moved = identify(tmp);
-            if (strcmp(moved, tmp) != 0) {
+            DIR *dir = opendir(tmp);
+            if (dir) {
+                closedir(dir);
+                response.info[RESPONSE_STATUS_CODE] = "301";
+                response.info[RESPONSE_REASON]      = "Moved Permanantly";
 
-            } else {
-                free(moved);
-                moved = NULL;
+                moved = 1;
+                char *loc = (char*) malloc(strlen(msg->info[REQUEST_PATH]) + 1);
+                strcpy(loc, msg->info[REQUEST_PATH]);
+                strcat(loc, "/");
+
+                insert_header(&response, &(struct header) {.name = "Location", .value = loc});
             }
         }
 
-        if (moved == NULL) {
-
+        if (!moved) {
+            response.info[RESPONSE_STATUS_CODE] = "404";
+            response.info[RESPONSE_REASON]      = "Not Found";
         }
-        */
     } else {
+        response.info[RESPONSE_STATUS_CODE] = "200";
+        response.info[RESPONSE_REASON] = "OK";
+
         fseek(f, 0, SEEK_END);
         long size = ftell(f);
         fseek(f, 0, SEEK_SET);
 
-        char reply[size];
-        fread(reply, size, 1, f);
+        char *res = (char*) malloc(size + 1);
+        fread(res, size, 1, f);
+        res[size] = '\0';
 
-        send(client->socket, reply, size, 0);
+        response.message = res;
+        fclose(f);
     }
 
-    fclose(f);
+    char* encode = encode_http_message(&response);
+    send(client->socket, encode, strlen(encode), 0);
+    free(encode);
     free(path);
 }
 

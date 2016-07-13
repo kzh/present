@@ -15,13 +15,15 @@ struct http_message {
 
     /*
     REQUEST:  1 - METHOD, 2 - PATH, 3 - VERSION
-    RESPONSE: 1 - ERSION, 2 - STATUS CODE, 3 - REASON
+    RESPONSE: 1 - VERSION, 2 - STATUS CODE, 3 - REASON
     */
     char* info[3];
+    char* message;
 };
 
 void parse_http_message(struct http_message *msg, char *buffer);
 void free_http_message(struct http_message *msg);
+char* encode_http_message(struct http_message *msg);
 
 void insert_header(struct http_message *msg, struct header *header);
 char* get_header_from(struct http_message *msg, char *search); 

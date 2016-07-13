@@ -10,13 +10,17 @@ int parse_header(struct header *header, char *str) {
 
     char *save;
     header->name  = strtok_r(str, ":", &save);
-    header->value = strtok_r(NULL, "", &save);
+
+    char* value = strtok_r(NULL, "", &save);
+    header->value = malloc(strlen(value));
+    strcpy(header->value, value);
     return 1;
 }
 
 void insert_header(struct http_message *msg, struct header *header) {
     header->next = (struct header*) calloc(1, sizeof(struct header));
     if (msg->headers_count == 0) {
+        msg->headers = (struct header*) calloc(1, sizeof(struct header));
         memcpy(msg->headers, header, sizeof(struct header));
     } else {
         struct header *tmp = msg->headers;
@@ -39,7 +43,7 @@ void prepare_str(char *str) {
         }
 
         char *dest = str + (++i);
-        while (i < length && (str[++i] == ' ' || str[i] == '\t')); 
+        while (i < length && (str[++i] == ' ' || str[i] == '\t'));
 
         char *move = str + i;
         if (dest != move) {
@@ -63,9 +67,7 @@ void prepare_str(char *str) {
 
 void parse_http_message(struct http_message *msg, char *str) {
     prepare_str(str);
-
     msg->headers_count = 0;
-    msg->headers       = (struct header*) calloc(1, sizeof(struct header));
 
     char *save;
     msg->info[REQUEST_METHOD]  = strtok_r(str, " ", &save);
@@ -81,6 +83,57 @@ void parse_http_message(struct http_message *msg, char *str) {
 
         insert_header(msg, &header);
     }
+}
+
+extern inline void concat(char **str, char* add) {
+    char *tmp = (char*) malloc(strlen(*str) + strlen(add));
+    strcpy(tmp, *str);
+    strcat(tmp, add);
+
+    free(*str);
+    *str = tmp;
+}
+
+char* encode_http_message(struct http_message *msg) {
+    char *raw = (char*) malloc(1);
+    strcpy(raw, "");
+
+    for (int i = 0; i != sizeof(msg->info) / sizeof(msg->info[0]); i++) {
+        if (msg->info[i] == NULL) {
+            break;
+        }
+
+        concat(&raw, msg->info[i]);
+        if (i != sizeof(msg->info) / sizeof(msg->info[0]) - 1) {
+            concat(&raw, " ");
+        }
+    }
+    concat(&raw, "\r\n");
+
+    if (msg->message != NULL) {
+        concat(&raw, "Content-Length: "); 
+
+        char size[100];
+        sprintf(size, "%ld", strlen(msg->message));
+        concat(&raw, size); 
+        concat(&raw, "\r\n");
+    } 
+
+    if (msg->headers_count != 0) {
+        for (struct header *header = msg->headers; header->next != NULL; header = header->next) {
+            concat(&raw, header->name);
+            concat(&raw, ": ");
+            concat(&raw, header->value);
+            concat(&raw, "\r\n");
+        }
+    }
+    concat(&raw, "\r\n");
+
+    if (msg->message != NULL) {
+        concat(&raw, msg->message);
+    }
+
+    return raw;
 }
 
 char* get_header_from(struct http_message *msg, char *search) {
@@ -105,9 +158,14 @@ void free_headers(struct header *headers) {
         free_headers(headers->next);
     }
 
+    free(headers->value);
     free(headers);
 }
 
 void free_http_message(struct http_message *msg) {
+    if (msg->message != NULL) {
+        free(msg->message);
+    }
+
     free_headers(msg->headers);
 }
