@@ -9,7 +9,6 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <pthread.h>
-#include <ctype.h>
 
 
 #include "http.h"
@@ -25,7 +24,7 @@ struct client {
 };
 
 char* identify(struct server *server, char* p) {
-    char* path = malloc(sizeof(p) + 1);
+    char* path = malloc(strlen(p) + 1);
     strcpy(path, p);
 
     for (struct route *route = server->routes; route != NULL; route = route->next) {

@@ -86,7 +86,7 @@ void parse_http_message(struct http_message *msg, char *str) {
 }
 
 extern inline void concat(char **str, char* add) {
-    char *tmp = (char*) malloc(strlen(*str) + strlen(add));
+    char *tmp = (char*) malloc(strlen(*str) + strlen(add) + 1);
     strcpy(tmp, *str);
     strcat(tmp, add);
 
@@ -117,7 +117,7 @@ char* encode_http_message(struct http_message *msg) {
         sprintf(size, "%ld", strlen(msg->message));
         concat(&raw, size); 
         concat(&raw, "\r\n");
-    } 
+    }
 
     if (msg->headers_count != 0) {
         for (struct header *header = msg->headers; header->next != NULL; header = header->next) {
