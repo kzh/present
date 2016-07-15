@@ -18,18 +18,16 @@ int parse_header(struct header *header, char *str) {
 }
 
 void insert_header(struct http_message *msg, struct header *header) {
-    header->next = (struct header*) calloc(1, sizeof(struct header));
-    if (msg->headers_count == 0) {
-        msg->headers = (struct header*) calloc(1, sizeof(struct header));
+    header->next = NULL;
+    if (msg->headers == NULL) {
+        msg->headers = (struct header*) malloc(sizeof(struct header));
         memcpy(msg->headers, header, sizeof(struct header));
     } else {
         struct header *tmp = msg->headers;
-        for (int i = 0; i != msg->headers_count; i++) {
-            tmp = tmp->next;
-        }
-        memcpy(tmp, header, sizeof(struct header));
+        for (; tmp->next != NULL; tmp = tmp->next); 
+        tmp->next = (struct header*) malloc(sizeof(struct header));
+        memcpy(tmp->next, header, sizeof(struct header));
     }
-    msg->headers_count++;
 }
 
 // Condenses raw http message strings
@@ -67,15 +65,16 @@ void prepare_str(char *str) {
 
 void parse_http_message(struct http_message *msg, char *str) {
     prepare_str(str);
-    msg->headers_count = 0;
+    msg->headers = NULL;
 
     char *save;
     msg->info[REQUEST_METHOD]  = strtok_r(str, " ", &save);
     msg->info[REQUEST_PATH]    = strtok_r(NULL, " ", &save);
-    msg->info[REQUEST_VERSION] = strtok_r(NULL, "\n\r", &save);
+    msg->info[REQUEST_VERSION] = strtok_r(NULL, "\r\n", &save);
 
     char *token;
-    while ((token = strtok_r(NULL, "\n\r", &save)) != NULL) {
+    while ((token = strtok_r(NULL, "\r\n", &save)) != NULL) {
+        printf("Token:\n%s\n", token);
         struct header header;
         if (!parse_header(&header, token)) {
             break;
@@ -83,6 +82,9 @@ void parse_http_message(struct http_message *msg, char *str) {
 
         insert_header(msg, &header);
     }
+
+    msg->message = (char*) malloc(strlen(token) + 1); 
+    strcpy(msg->message, token);
 }
 
 extern inline void concat(char **str, char* add) {
@@ -119,8 +121,8 @@ char* encode_http_message(struct http_message *msg) {
         concat(&raw, "\r\n");
     }
 
-    if (msg->headers_count != 0) {
-        for (struct header *header = msg->headers; header->next != NULL; header = header->next) {
+    if (msg->headers != NULL) {
+        for (struct header *header = msg->headers; header != NULL; header = header->next) {
             concat(&raw, header->name);
             concat(&raw, ": ");
             concat(&raw, header->value);
@@ -137,12 +139,12 @@ char* encode_http_message(struct http_message *msg) {
 }
 
 char* get_header_from(struct http_message *msg, char *search) {
-    if (msg->headers_count == 0) {
+    if (msg->headers == NULL) {
         return NULL;
     }
 
     struct header *header = msg->headers;
-    while (header->next != NULL) {
+    while (header != NULL) {
         if (strcmp(header->name, search) == 0) {
             return header->value;
         }
@@ -167,5 +169,7 @@ void free_http_message(struct http_message *msg) {
         free(msg->message);
     }
 
-    free_headers(msg->headers);
+    if (msg->headers != NULL) {
+        free_headers(msg->headers);
+    }
 }

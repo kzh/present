@@ -11,12 +11,9 @@ struct header {
 
 struct http_message {
     struct header *headers;
-    int headers_count;
 
-    /*
-    REQUEST:  1 - METHOD, 2 - PATH, 3 - VERSION
-    RESPONSE: 1 - VERSION, 2 - STATUS CODE, 3 - REASON
-    */
+    // REQUEST:  1 - METHOD, 2 - PATH, 3 - VERSION
+    // RESPONSE: 1 - VERSION, 2 - STATUS CODE, 3 - REASON
     char* info[3];
     char* message;
 };
