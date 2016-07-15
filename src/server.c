@@ -43,7 +43,7 @@ char* identify(struct server *server, char* p) {
     }
 
     if (path[strlen(path) - 1] == '/') {
-        const char* alts[] = {"index.html", "index.tmpl"};
+        const char* alts[] = {"index.tmpl", "index.html"};
         for (int i = 0; i != sizeof(alts) / sizeof(alts[0]); i++) {
             char *tmp = (char*) malloc(strlen(path) + strlen(alts[i]));
             strcpy(tmp, path);
