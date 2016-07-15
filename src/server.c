@@ -63,12 +63,21 @@ char* identify(struct server *server, char* p) {
 }
 
 void respond(struct client *client, struct http_message *msg) {
-    char* path = identify(client->server, msg->info[REQUEST_PATH]);
-    printf("Path: %s\n", path);
-
     struct http_message response;
     memset(&response, 0, sizeof(response));
     response.info[RESPONSE_VERSION]     = "HTTP/1.1";
+
+    if (msg->info[REQUEST_PATH] == NULL) {
+        response.info[RESPONSE_STATUS_CODE] = "400";
+        response.info[RESPONSE_REASON]      = "Bad Request";
+
+        char* encode = encode_http_message(&response);
+        send(client->socket, encode, strlen(encode), 0);
+        return;
+    }
+
+    char* path = identify(client->server, msg->info[REQUEST_PATH]);
+    printf("Path: %s\n", path);
 
     FILE *f;
     f = fopen(path, "r+b");
@@ -134,6 +143,7 @@ void* handle_request(void* arg) {
 
         struct http_message msg;
         parse_http_message(&msg, buffer_in);
+
         respond(client, &msg);
         free_http_message(&msg);
     }
